@@ -110,7 +110,7 @@ module ObjectiveCi
       command = "#{binary} #{cl_options} #{tail}"
       command.prepend("bundle exec ") unless binary == "xcodebuild"
       puts command
-      system(command)
+      puts `#{command}`
     end
     private :call_binary
 

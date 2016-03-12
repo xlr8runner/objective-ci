@@ -6,9 +6,9 @@ module ObjectiveCi
 
     attr_accessor :exclusions
 
-    LINT_DESTINATION = "lint.xml"
+    LINT_DESTINATION = "lint.html"
     DUPLICATION_DESTINATION = "duplication.xml"
-    LINE_COUNT_DESTINATION = "line-count.sc"    
+    LINE_COUNT_DESTINATION = "line-count.sc"
 
     def initialize
       @exclusions = ["vendor"]
@@ -29,17 +29,18 @@ module ObjectiveCi
       requires_at_least_one_option(opts, :workspace, :project)
       requires_options(opts, :scheme)
       opts[:configuration] ||= "Release"
+      opts[:output] ||= "./lint.html"
+      opts[:destination] ||= "'platform=iOS Simulator,name=iPad 2,OS=9.2'"
+      opts[:sdk] ||= "iphonesimulator"
 
-      sliced_opts = opts.select { |k, v| [:scheme, :workspace, :project, :configuration].include?(k) }
+      sliced_opts = opts.select { |k, v| [:scheme, :workspace, :project, :destination, :configuration, :sdk].include?(k) }
       xcodebuild_opts_string = sliced_opts.reduce("") { |str, (k, v)| str += " -#{k} #{v}" }
-      xcodebuild_opts_string += " ONLY_ACTIVE_ARCH=NO clean build"
 
-      call_binary("xcodebuild", xcodebuild_opts_string, "| tee xcodebuild.log", opts)
-      # oclint-xcodebuild will fail if we don't exclude Pods (absolute path)
-      pods_dir = "#{Dir.pwd}/Pods"
-      call_binary("oclint-xcodebuild", "-e \"#{pods_dir}\"", "", opts)
-      ocjcd_opts_string = "#{exclusion_options_list("-e")} -- -report-type=pmd -o=#{LINT_DESTINATION}"
+      call_binary("xcodebuild", xcodebuild_opts_string, "| tee xcodebuild.log | xcpretty -r json-compilation-database", opts)
+		  system("mv build/reports/compilation_db.json ./compile_commands.json")
+      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]}"
       call_binary("oclint-json-compilation-database", ocjcd_opts_string, "", opts)
+		  system("rm ./compile_commands.json")
     end
 
     def test_suite(opts={})
@@ -48,18 +49,23 @@ module ObjectiveCi
       if !opts[:xcodebuild_override] && xcode_version < 5.0
         puts_red "WARNING: Xcode version #{xcode_version} is less than 5.0, and tests will likely not run"
       end
-      
-      sliced_opts = opts.select { |k, v| [:scheme, :workspace, :project].include?(k) }
+
+      opts[:destination] ||= "'platform=iOS Simulator,name=iPad 2,OS=9.2'"
+      opts[:sdk] ||= "iphonesimulator"
+      opts[:configuration] ||= "Release"
+
+      sliced_opts = opts.select { |k, v| [:scheme, :workspace, :project, :destination, :configuration, :sdk].include?(k) }
       xcodebuild_opts_string = sliced_opts.reduce("") { |str, (k, v)| str += " -#{k} #{v}" }
 
-      xcodebuild_opts_string += " -destination name=iPad -destination-timeout=10 ONLY_ACTIVE_ARCH=NO test"
-      call_binary("xcodebuild", xcodebuild_opts_string, ">&1 | bundle exec ocunit2junit", opts)
+      xcodebuild_opts_string += " test"
+      call_binary("xcodebuild", xcodebuild_opts_string, " | tee xcodebuild.log | bundle exec xcpretty --color --report html", opts)
     end
 
     def lines_of_code(opts={})
+      opts[:output] = "./#{LINE_COUNT_DESTINATION}"
       call_binary("sloccount",
                   "--duplicates --wide --details .",
-                  "| grep -v #{exclusion_options_list("-e")} > #{LINE_COUNT_DESTINATION}", 
+                  "| grep -v #{exclusion_options_list("-e")} > #{opts[:output]}",
                   opts)
     end
 
@@ -67,12 +73,20 @@ module ObjectiveCi
       opts[:minimum_tokens] ||= 100
       # Use `sed` to change paths like `/some/code/./path.m` to `/some/code/path.m`, or else the Violations plugin in Jenkins
       # doesn't work correctly.
+      opts[:output] || "./#{DUPLICATION_DESTINATION}"
       call_binary("pmd-cpd-objc",
                   "--minimum-tokens #{opts[:minimum_tokens]}",
-                  "| LC_CTYPE=C LANG=C sed 's/\\/\\.\\//\\//' > #{DUPLICATION_DESTINATION}", 
+                  "| LC_CTYPE=C LANG=C sed 's/\\/\\.\\//\\//' > #{opts[:output]}",
                   opts)
       pmd_exclude
       pmd_patch
+    end
+
+    def code_coverage(opts={})
+      requires_options(opts, :scheme, :project)
+      opts[:output] ||= "./coverage"
+      # Use slather to compute code coverage here instead of Rakefile
+      call_binary("slather coverage --input-format profdata --html --output-directory #{opts[:output]} --scheme #{opts[:scheme]} #{opts[:project]}")
     end
 
     def exclusion_options_list(option_flag)
@@ -97,7 +111,7 @@ module ObjectiveCi
       command = "#{binary} #{cl_options} #{tail}"
       command.prepend("bundle exec ") unless binary == "xcodebuild"
       puts command
-      puts `#{command}`
+      system(command)
     end
     private :call_binary
 
@@ -146,6 +160,6 @@ module ObjectiveCi
       puts "\e[31m#{str}\e[0m"
     end
     private :puts_red
-    
+
   end
 end

@@ -37,10 +37,9 @@ module ObjectiveCi
       xcodebuild_opts_string = sliced_opts.reduce("") { |str, (k, v)| str += " -#{k} #{v}" }
 
       call_binary("xcodebuild", xcodebuild_opts_string, "| tee xcodebuild.log | xcpretty -r json-compilation-database", opts)
-		  system("mv build/reports/compilation_db.json ./compile_commands.json")
+      system("mv build/reports/compilation_db.json ./compile_commands.json")
       ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]}"
       call_binary("oclint-json-compilation-database", ocjcd_opts_string, "", opts)
-		  system("rm ./compile_commands.json")
     end
 
     def test_suite(opts={})

@@ -32,13 +32,14 @@ module ObjectiveCi
       opts[:output] ||= "./lint.html"
       opts[:destination] ||= "'platform=iOS Simulator,name=iPad 2,OS=9.2'"
       opts[:sdk] ||= "iphonesimulator"
+      opts[:oclint_options] ||= ""
 
       sliced_opts = opts.select { |k, v| [:scheme, :workspace, :project, :destination, :configuration, :sdk].include?(k) }
       xcodebuild_opts_string = sliced_opts.reduce("") { |str, (k, v)| str += " -#{k} #{v}" }
 
       call_binary("xcodebuild", xcodebuild_opts_string, " clean build | xcpretty -r json-compilation-database", opts)
       system("mv build/reports/compilation_db.json ./compile_commands.json")
-      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]}"
+      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]} #{opts[:oclint_options]}"
       call_binary("oclint-json-compilation-database", ocjcd_opts_string, "", opts)
     end
 

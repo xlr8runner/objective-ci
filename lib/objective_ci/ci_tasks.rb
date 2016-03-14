@@ -38,7 +38,7 @@ module ObjectiveCi
 
       call_binary("xcodebuild", xcodebuild_opts_string, "| xcpretty -r json-compilation-database", opts)
       system("mv build/reports/compilation_db.json ./compile_commands.json")
-      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]} -rc LONG_LINE=150"
+      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]}"
       call_binary("oclint-json-compilation-database", ocjcd_opts_string, "", opts)
     end
 

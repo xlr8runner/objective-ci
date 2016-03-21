@@ -14,7 +14,6 @@ module ObjectiveCi
       @exclusions = ["vendor"]
       if using_pods?
         @exclusions << "Pods"
-        `bundle exec pod install`
       end
     end
 

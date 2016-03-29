@@ -38,7 +38,7 @@ module ObjectiveCi
 
       call_binary("xcodebuild", xcodebuild_opts_string, " clean build | xcpretty -r json-compilation-database", opts)
       system("mv build/reports/compilation_db.json ./compile_commands.json")
-      ocjcd_opts_string = "-e \"Pods\" -- -report-type html -o #{opts[:output]} #{opts[:oclint_options]}"
+      ocjcd_opts_string = "-e \"Pods\" -- -report-type pmd -o #{opts[:output]} #{opts[:oclint_options]}"
       call_binary("oclint-json-compilation-database", ocjcd_opts_string, "", opts)
     end
 
@@ -57,7 +57,7 @@ module ObjectiveCi
       xcodebuild_opts_string = sliced_opts.reduce("") { |str, (k, v)| str += " -#{k} #{v}" }
 
       xcodebuild_opts_string += " test"
-      call_binary("xcodebuild", xcodebuild_opts_string, " | tee xcodebuild.log | bundle exec xcpretty --color --report html", opts)
+      call_binary("xcodebuild", xcodebuild_opts_string, " | tee xcodebuild.log | bundle exec xcpretty --color --report junit", opts)
     end
 
     def lines_of_code(opts={})
@@ -85,7 +85,7 @@ module ObjectiveCi
       requires_options(opts, :scheme, :project)
       opts[:output] ||= "./coverage"
       # Use slather to compute code coverage here instead of Rakefile
-      call_binary("slather", "coverage --input-format profdata --html --output-directory #{opts[:output]} --scheme #{opts[:scheme]} #{opts[:project]}", "", opts)
+      call_binary("slather", "coverage --input-format profdata -x --output-directory #{opts[:output]} --scheme #{opts[:scheme]} #{opts[:project]}", "", opts)
     end
 
     def exclusion_options_list(option_flag)
